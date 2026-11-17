@@ -1,0 +1,1080 @@
+<!doctype html>
+<html lang="ru"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no"><meta name="robots" content="noindex,nofollow"></head><body>
+<title>Ростикс × Чеховские медведи</title>
+<style>
+  /* шрифты бренда с rostics.ru (Cera Pro, TypeMates — платный): только для внутреннего демо, в работу — файлы от клиента */
+  @font-face { font-family: "Cera Condensed"; font-weight: 900; font-display: swap; src: url(assets/fonts/CeraCondensedPro-Black.woff) format("woff"); }
+  @font-face { font-family: "Cera Pro"; font-weight: 400; font-display: swap; src: url(assets/fonts/CeraPro-Regular.woff) format("woff"); }
+  @font-face { font-family: "Cera Pro"; font-weight: 500; font-display: swap; src: url(assets/fonts/CeraPro-Medium.woff) format("woff"); }
+  @font-face { font-family: "Cera Pro"; font-weight: 700; font-display: swap; src: url(assets/fonts/CeraPro-Bold.woff) format("woff"); }
+  /* поле 360 в ширину, высота 640–800 по экрану — как в игре Зума; на десктопе игра колонкой между двумя блоками лендинга.
+     Интерфейс — по приложению Ростикс (Screen Gallery, замер 26.10): красный #ef2e30, второстепенные плашки и поля #f5f2ed,
+     кнопка-«таблетка» 46, заголовки строчными Cera Condensed Black, текст почти чёрный, полоса 4. Одна светлая тема — бренд белый. */
+  :root {
+    --red: #ef2e30;
+    --red-deep: #d6262a;
+    --ink: #121212;
+    --muted: #77716f;
+    --paper: #ffffff;
+    --field: #faf9f6;
+    --chip: #f5f2ed;
+    --display: "Cera Condensed", "Arial Narrow", sans-serif;
+    --body: "Cera Pro", system-ui, -apple-system, "Segoe UI", sans-serif;
+    --u: 1px;
+    color-scheme: light;
+  }
+  * { box-sizing: border-box; }
+  html, body { height: 100%; }
+  body {
+    margin: 0; background: var(--paper); color: var(--ink); font: 400 15px/1.35 var(--body);
+    display: flex; align-items: center; justify-content: center; overflow: hidden;
+    overscroll-behavior: none; touch-action: none; -webkit-user-select: none; user-select: none;
+  }
+  #wrap { position: relative; width: 360px; height: 640px; overflow: hidden; background: var(--field); flex: none; }
+  canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
+
+  /* шапка: жизни слева, счёт по центру, пауза справа; от бортов ROSTIC'S (14) зазор 16 — правка Антона 26.10 */
+  #hud { position: absolute; left: 0; right: 0; top: 0; height: calc(64 * var(--u)); pointer-events: none; transition: opacity .2s; }
+  #hud.dim { opacity: 0; }
+  #hLives { position: absolute; left: calc(30 * var(--u)); top: calc(20 * var(--u)); display: flex; gap: calc(5 * var(--u)); }
+  #hLives svg { width: calc(24 * var(--u)); height: calc(22 * var(--u)); display: block; transition: opacity .2s, transform .2s; }
+  #hLives svg.lost { opacity: .18; transform: scale(.85); }
+  #hScore { position: absolute; left: 0; right: 0; top: calc(10 * var(--u)); text-align: center;
+    font: 900 calc(32 * var(--u))/1 var(--display); color: var(--ink); font-variant-numeric: tabular-nums; }
+  #bPause { position: absolute; right: calc(28 * var(--u)); top: calc(16 * var(--u)); width: calc(36 * var(--u)); height: calc(36 * var(--u));
+    border: 0; border-radius: 50%; background: var(--paper); box-shadow: 0 calc(2 * var(--u)) calc(8 * var(--u)) rgba(29,26,26,.14);
+    display: none; place-items: center; cursor: pointer; pointer-events: auto; padding: 0; }
+  #bPause::before { content: ""; width: calc(12 * var(--u)); height: calc(14 * var(--u));
+    background: linear-gradient(90deg, var(--ink) 0 35%, transparent 35% 65%, var(--ink) 65%); }
+
+  .screen {
+    position: absolute; inset: 0; display: none; flex-direction: column; align-items: center; justify-content: flex-end;
+    gap: calc(12 * var(--u)); padding: calc(24 * var(--u)) calc(18 * var(--u)) calc(26 * var(--u)); text-align: center;
+    background: linear-gradient(to bottom, rgba(255,255,255,0) 0%, rgba(255,255,255,.82) 30%, rgba(255,255,255,.97) 55%);
+  }
+  .screen.on { display: flex; }
+  .screen.center { justify-content: center; background: rgba(255,255,255,.92); }
+  .eyebrow { font: 500 calc(14 * var(--u))/1.2 var(--body); color: var(--muted); }
+  .title { font: 900 calc(40 * var(--u))/1 var(--display); color: var(--ink); margin: 0; text-wrap: balance; }
+  .title em { font-style: normal; color: var(--red); }
+  .sub { font: 400 calc(15 * var(--u))/1.35 var(--body); color: var(--ink); max-width: calc(290 * var(--u)); margin: 0; }
+  .btn {
+    font: 400 calc(17 * var(--u))/1 var(--body); color: #fff; background: var(--red); border: 0; border-radius: 999px;
+    height: calc(46 * var(--u)); width: 100%; max-width: calc(336 * var(--u)); cursor: pointer; transition: transform .08s, background .15s;
+  }
+  .btn:hover { background: var(--red-deep); }
+  .btn:active { transform: scale(.98); }
+  .btn.ghost { background: var(--chip); color: var(--ink); }
+  .btn.ghost:hover { background: #ece7df; }
+  .btn:focus-visible, #bPause:focus-visible { outline: calc(3 * var(--u)) solid var(--ink); outline-offset: calc(2 * var(--u)); }
+  .btn[disabled] { opacity: .45; pointer-events: none; }
+  .attempts { font: 400 calc(14 * var(--u))/1.3 var(--body); color: var(--muted); }
+  /* красная плашка-«таблетка», как «Кешбэк 1%» в «Чикен Клаб» */
+  .attempts b { color: #fff; background: var(--red); font-weight: 500; border-radius: 999px; padding: calc(2 * var(--u)) calc(8 * var(--u)); white-space: nowrap; }
+  .goal { width: 100%; max-width: calc(324 * var(--u)); display: flex; flex-direction: column; gap: calc(8 * var(--u)); }
+  .goal-text { font: 500 calc(16 * var(--u))/1.3 var(--body); color: var(--ink); }
+  .goal-text b { font: 900 calc(22 * var(--u))/1 var(--display); color: var(--red); white-space: nowrap; }
+  /* полоса как в «Чикен Клаб» приложения Ростикс: тонкая красная, под ней «До промокода · ещё N очков» */
+  .bar { height: calc(4 * var(--u)); border-radius: 999px; background: #e6e4e7; overflow: hidden; }
+  .bar i { display: block; height: 100%; width: 0; border-radius: inherit; background: var(--red); transition: width .7s cubic-bezier(.2, .8, .2, 1); }
+  .goal-cap { display: flex; justify-content: space-between; align-items: baseline; font: 400 calc(14 * var(--u))/1.2 var(--body); color: var(--ink); }
+  .goal-cap b { font-weight: 500; }
+  /* код — в бежевом поле-«таблетке», как поле «Акции и промокоды» в корзине */
+  .code { font: 900 calc(28 * var(--u))/1 var(--display); letter-spacing: .04em; color: var(--ink); background: var(--chip);
+    border-radius: 999px; padding: calc(12 * var(--u)) calc(28 * var(--u)); align-self: center; }
+  .big { font: 900 calc(84 * var(--u))/.9 var(--display); color: var(--red); font-variant-numeric: tabular-nums; }
+  table.lb { border-collapse: collapse; width: 100%; max-width: calc(320 * var(--u)); font: 400 calc(15 * var(--u)) var(--body); font-variant-numeric: tabular-nums; }
+  table.lb td { padding: calc(8 * var(--u)) calc(4 * var(--u)); text-align: left; border-bottom: 1px solid #ece8e8; }
+  table.lb td:first-child { width: 2em; color: var(--muted); }
+  table.lb td:last-child { text-align: right; font-family: var(--display); font-weight: 600; font-size: calc(17 * var(--u)); }
+  table.lb tr.me td { color: var(--red); font-weight: 600; }
+
+  /* стартовый экран — кадр Антона в Figma (rostics 50:2, 28.10): фоном бледный знак клуба, всё собрано к низу.
+     Меры кадра 390×844 в --f (ширина/390; на низком экране ужимается, чтобы влезло) */
+  #sStart { background: #fff; justify-content: flex-end; gap: 0; padding: 0 0 calc(23 * var(--f)); overflow: hidden; }
+  #sStart > * { position: relative; }
+  #sStart > .st-bg { position: absolute; left: calc(50% - 4 * var(--f)); bottom: calc(320 * var(--f)); width: calc(551 * var(--f)); height: calc(490 * var(--f));
+    transform: translateX(-50%) rotate(-15deg); object-fit: contain; opacity: .05; pointer-events: none; }
+  [data-sport] .st-bg { filter: grayscale(1); }
+  .st-lockup { display: flex; align-items: center; gap: calc(15 * var(--f)); height: calc(61 * var(--f)); }
+  .st-lockup img { display: block; height: 100%; width: auto; }
+  .st-lockup span { font: 400 calc(24 * var(--f))/calc(25 * var(--f)) var(--body); color: var(--muted); }
+  .st-cap { font: 400 calc(18 * var(--f))/calc(22 * var(--f)) var(--body); color: var(--muted); margin-top: calc(19 * var(--f)); }
+  .st-title { margin: calc(15 * var(--f)) 0 0; display: flex; flex-direction: column; align-items: center; text-transform: uppercase; font: 900 1px var(--display); }
+  .st-title span { font-size: calc(134 * var(--f)); line-height: calc(108 * var(--f)); color: var(--ink); }
+  .st-title em { font-style: normal; font-size: calc(69 * var(--f)); line-height: calc(80 * var(--f)); width: calc(270 * var(--f)); margin-top: calc(3 * var(--f));
+    color: #fff; background: var(--red); border-radius: calc(15 * var(--f)); }
+  .tiles { display: flex; gap: calc(10 * var(--f)); margin-top: calc(47 * var(--f)); }
+  .tiles > div { box-sizing: border-box; width: calc(109 * var(--f)); height: calc(123 * var(--f)); background: var(--chip); border-radius: calc(17 * var(--f));
+    padding: calc(13 * var(--f)) calc(6 * var(--f)) calc(12 * var(--f)); display: flex; flex-direction: column; align-items: center; gap: calc(4 * var(--f));
+    font: 400 calc(14 * var(--f))/calc(16 * var(--f)) var(--body); color: var(--muted); }
+  .tiles .ic { display: flex; align-items: center; gap: calc(5 * var(--f)); height: calc(33 * var(--f)); }
+  .tiles .ic.food { gap: 0; }
+  .tiles canvas { position: static; width: calc(33 * var(--f)); height: calc(33 * var(--f)); }
+  .tiles canvas[data-k="dot"] { width: calc(25 * var(--f)); height: calc(25 * var(--f)); }
+  .tiles canvas[data-k="puck"] { width: calc(27 * var(--f)); height: calc(27 * var(--f)); }
+  .tiles b { font: 900 calc(23 * var(--f))/calc(24 * var(--f)) var(--display); color: var(--ink); }
+  .tiles .bad b { color: var(--red); }
+  #sStart > .goal, #sStart > .btn, .st-row { width: calc(347 * var(--f)); max-width: none; }
+  #sStart > .goal { gap: calc(7 * var(--f)); margin-top: calc(14 * var(--f)); }
+  #sStart .bar { height: calc(4 * var(--f)); border-radius: calc(2 * var(--f)); }
+  #sStart .goal-cap { font: 400 calc(15 * var(--f))/calc(18 * var(--f)) var(--body); }
+  #sStart > .btn { height: calc(50 * var(--f)); border-radius: calc(25 * var(--f)); font: 700 calc(18 * var(--f))/1 var(--body); margin-top: calc(13 * var(--f)); }
+  .st-row { display: flex; justify-content: space-between; align-items: center; height: calc(34 * var(--f)); margin-top: calc(13 * var(--f));
+    font: 400 calc(15 * var(--f))/calc(20 * var(--f)) var(--body); color: var(--muted); }
+  .st-row b { display: inline-block; margin-left: calc(8 * var(--f)); padding: 0 calc(8 * var(--f)); border-radius: calc(10 * var(--f));
+    color: #fff; background: var(--red); font-weight: 500; white-space: nowrap; }
+  .st-row button { font: 500 calc(16 * var(--f))/calc(20 * var(--f)) var(--body); color: var(--ink); background: none; border: 0; padding: calc(7 * var(--f)) 0; cursor: pointer; }
+  .st-row button::after { content: "›"; margin-left: calc(4 * var(--f)); font-size: calc(18 * var(--f)); color: var(--red); }
+  .side { display: none; }
+
+  /* ---------- десктоп: три колонки по 360, игра в центре 360×800; язык слайдов презы (слово Антона 28.10, слайд 1 — Figma 49:259):
+     белый фон (знак клуба фоном снят — слово Антона 28.10 15:28), телефон в чёрной рамке, слева лого × лого и «ЛОВИ / ВКУСНОЕ», справа бежевые карточки ---------- */
+  @media (min-width: 1024px) {
+    :root { padding-block: 0 !important; }
+    body {
+      display: grid; grid-template-columns: minmax(0, 360px) auto minmax(0, 360px); justify-content: center; align-items: center;
+      grid-template-rows: 100%; grid-auto-rows: 0; column-gap: clamp(24px, 5.8vw, 84px);
+      padding-left: max(24px, env(safe-area-inset-left, 0px)); padding-right: max(24px, env(safe-area-inset-right, 0px));
+      background: #fff;
+    }
+    /* телефон — рамка слайда: кант 13 и скругления 53/40 при экране 439, здесь пересчитаны на 360 */
+    #wrap { grid-row: 1; border-radius: 33px; box-shadow: 0 0 0 11px #121212; }
+    .side { grid-row: 1; display: flex; flex-direction: column; gap: 28px; color: var(--ink); width: 100%; max-width: 360px; }
+    .side.left { align-items: center; gap: 0; text-align: center; }
+    /* слева — меры слайда 1 (px макета 1920) × 0,75: лого × лого, подпись, «ЛОВИ / ВКУСНОЕ» и коротко — как управлять (слово Антона 15:38) */
+    .side.left { --k: .75px; }
+    .lockup { display: flex; align-items: center; gap: calc(24 * var(--k)); height: calc(88 * var(--k)); }
+    .lockup img { display: block; height: 100%; width: auto; }
+    .lockup .x { font: 400 calc(40 * var(--k))/1 var(--body); color: #8a8580; }
+    .side .d-cap { font: 400 calc(32 * var(--k))/calc(40 * var(--k)) var(--body); color: #8a8580; margin-top: calc(20 * var(--k)); white-space: nowrap; }
+    .side h1 { margin: calc(35 * var(--k)) 0 0; display: flex; flex-direction: column; align-items: center; text-transform: uppercase; font: 900 1px var(--display); }
+    .side h1 span { font-size: calc(224 * var(--k)); line-height: calc(181 * var(--k)); }
+    .side h1 em { font-style: normal; font-size: calc(121 * var(--k)); line-height: calc(126 * var(--k)); width: calc(440 * var(--k)); margin-top: calc(5 * var(--k));
+      color: #fff; background: var(--red); border-radius: calc(21 * var(--k)); }
+    [data-sport="handball"] .side .d-cap { font-size: 19px; }
+    .side .d-line { font: 400 19px/26px var(--body); color: var(--ink); margin-top: 28px; white-space: nowrap; }
+    .card { background: var(--chip); color: var(--ink); border-radius: 24px; padding: 22px 24px; }
+    .card h3 { font: 900 34px/1 var(--display); text-transform: uppercase; margin: 0 0 12px; }
+    .card table { width: 100%; border-collapse: collapse; font: 400 15px var(--body); font-variant-numeric: tabular-nums; }
+    .card td { padding: 7px 0; border-bottom: 1px solid #e6e1d9; }
+    .card td:last-child { text-align: right; font: 900 17px var(--display); }
+    .card tr.win td { color: var(--red); }
+    .prize { display: flex; flex-direction: column; gap: 14px; }
+    .prize div { display: flex; flex-direction: column; gap: 2px; font: 400 14px/1.3 var(--body); color: var(--muted); }
+    .prize b { font: 900 20px/1.15 var(--display); color: var(--ink); }
+    .touch { display: none; }
+  }
+  @media (prefers-reduced-motion: reduce) { .btn { transition: none; } }
+</style>
+
+<aside class="side left">
+  <div class="lockup"><img src="assets/rostics-logo.png" alt="Ростикс"><span class="x">×</span><img class="st-mark" src="assets/traktor-logo.svg" alt="ХК «Трактор»"></div>
+  <div class="d-cap st-cap">Ростикс × ХК «Трактор»</div>
+  <h1><span>Лови</span><em>вкусное</em></h1>
+  <div class="d-line">Води мышкой или стрелками ← →.<br>Лови еду, не лови точки и короны.</div>
+</aside>
+
+<div id="wrap">
+  <canvas id="c"></canvas>
+  <div id="hud" class="dim">
+    <div id="hLives"></div>
+    <div id="hScore">0</div>
+    <button id="bPause" type="button" aria-label="Пауза"></button>
+  </div>
+
+  <!-- стартовый экран — кадр Антона в Figma (rostics 50:2, 28.10) -->
+  <div class="screen on" id="sStart">
+    <img class="st-bg st-mark" src="assets/traktor-logo.svg" alt="">
+    <div class="st-lockup"><img src="assets/rostics-logo.png" alt="Ростикс"><span>×</span><img class="st-mark" src="assets/traktor-logo.svg" alt="ХК «Трактор»"></div>
+    <div class="st-cap">Ростикс × ХК «Трактор»</div>
+    <h2 class="st-title"><span>Лови</span><em>вкусное</em></h2>
+    <div class="tiles">
+      <div><span class="ic food"><canvas data-k="burger" data-z="1.06"></canvas><canvas data-k="leg" data-z="1.05"></canvas><canvas data-k="fries"></canvas></span><b>+10…25</b><span>еда<br>из&nbsp;Ростикса</span></div>
+      <div class="bad"><span class="ic"><canvas data-k="crown" data-z="1.06"></canvas><canvas data-k="dot" data-z="1.58"></canvas></span><b>−1 жизнь</b><span>точки<br>и&nbsp;короны</span></div>
+      <div><span class="ic"><canvas data-k="puck" data-z="1.24"></canvas></span><b>+300</b><span class="st-thing">шайба<br>Трактора</span></div>
+    </div>
+    <div class="goal" id="startGoal"></div>
+    <button class="btn" id="bPlay" type="button">Играть</button>
+    <div class="st-row"><span id="attLine"></span><button id="bBoard" type="button">Рейтинг недели</button></div>
+  </div>
+
+  <div class="screen center" id="sBoard">
+    <div class="eyebrow">Рейтинг недели</div>
+    <div class="sub">Лучшие по&nbsp;итогам недели получают промокоды на&nbsp;скидку в&nbsp;Ростикс</div>
+    <table class="lb" id="lb"></table>
+    <button class="btn ghost" id="bBoardBack" type="button">Назад</button>
+  </div>
+
+  <div class="screen" id="sOver">
+    <div class="eyebrow" id="overTag">Попытка окончена</div>
+    <div class="big" id="overScore">0</div>
+    <div class="goal" id="overGoal"></div>
+    <div class="attempts" id="overText"></div>
+    <div class="attempts" id="attLine2"></div>
+    <button class="btn" id="bAgain" type="button">Ещё попытка</button>
+    <button class="btn ghost" id="bBoard2" type="button">Рейтинг недели</button>
+  </div>
+
+  <div class="screen center" id="sPause">
+    <h2 class="title">Пауза</h2>
+    <button class="btn" id="bResume" type="button">Продолжить</button>
+    <button class="btn ghost" id="bQuit" type="button">Закончить попытку</button>
+  </div>
+</div>
+
+<aside class="side right">
+  <div class="card">
+    <h3>Рейтинг недели</h3>
+    <table id="lbSide"></table>
+  </div>
+  <div class="card">
+    <h3>Призы</h3>
+    <div class="prize">
+      <div>1000 очков за&nbsp;попытку<b>промокод на скидку</b></div>
+      <div>Топ-10 недели<b>промокоды на скидку</b></div>
+      <div data-s="collab">Коллаб сезона<b>ХК Трактор, Челябинск</b></div>
+    </div>
+  </div>
+</aside>
+
+<script>
+(() => {
+  // ---------- хранилище (демо: всё в браузере) ----------
+  const store = {
+    get(k, d) { try { const v = localStorage.getItem(k); return v ? JSON.parse(v) : d; } catch (e) { return d; } },
+    set(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch (e) {} },
+  };
+  const today = () => new Date().toLocaleDateString('sv');
+  const DAILY = 3;
+  const UNLIMITED = true; // тестовый режим: попытки не списываются
+  function att() { const a = store.get('rt_att', null); return a && a.d === today() ? a : { d: today(), left: DAILY }; }
+  // ---------- спорт коллаба: шкурка выбирается ссылкой (#akron, #basketball, #handball; с #shot — #akron-shot); по умолчанию Трактор ----------
+  const TAGS = location.hash.slice(1).split('-');
+  const SHOT = TAGS.includes('shot');
+  const SPORTS = {
+    traktor: {
+      item: 'puck', bang: 'ЩЁЛК!', caught: 'ШАЙБА ПОЙМАНА', many: n => `шайб: ${n}`, board: 'rt_board',
+      club: 'ХК «Трактор»', mark: 'assets/traktor-logo.svg', thing: 'шайба', things: 'шайба Трактора',
+      seed: [['krylyshko', 4820], ['traktor_74', 4310], ['chel_ice', 3950], ['nozhka_pro', 3420], ['shaiba_master', 2980],
+        ['bucket_boy', 2470], ['ural_fan', 1990], ['metelitsa', 1540]],
+    },
+    // ФК Акрон, Тольятти (fcakron.ru): мяч с лого, удар с ноги, газон
+    akron: {
+      item: 'ball', bang: 'УДАР!', caught: 'МЯЧ ПОЙМАН', many: n => `мячей: ${n}`, board: 'rt_board_akron',
+      club: 'ФК «Акрон»', mark: 'assets/akron-logo.svg', thing: 'мяч', things: 'мяч Акрона',
+      seed: [['krylyshko', 4820], ['akron_63', 4310], ['tlt_fan', 3950], ['nozhka_pro', 3420], ['gol_master', 2980],
+        ['bucket_boy', 2470], ['volga_ball', 1990], ['metelitsa', 1540]],
+      title: 'Ростикс × Акрон',
+      text: {
+        collab: 'Коллаб сезона<b>ФК Акрон, Тольятти</b>',
+      },
+    },
+    // БК «Автодор», Саратов (лого — сайт Единой лиги ВТБ, SVG нет; слово Антона 28.10 — вместо УНИКСа): паркет, мяч с лого, передача с отскоком
+    basketball: {
+      item: 'bball', bang: 'ПАС!', caught: 'МЯЧ ПОЙМАН', many: n => `мячей: ${n}`, board: 'rt_board_avtodor',
+      club: 'БК «Автодор»', mark: 'assets/avtodor-logo.png', thing: 'мяч', things: 'мяч Автодора',
+      seed: [['krylyshko', 4820], ['avtodor_64', 4310], ['saratov_hoop', 3950], ['nozhka_pro', 3420], ['trehochkovy', 2980],
+        ['bucket_boy', 2470], ['basket_116', 1990], ['metelitsa', 1540]],
+      title: 'Ростикс × Автодор',
+      text: {
+        collab: 'Коллаб сезона<b>БК «Автодор», Саратов</b>',
+      },
+    },
+    // ГК «Чеховские медведи» (ch-medvedi.ru, медведь — векторный знак с их сайта): площадка с зонами вратаря, замах и бросок без руки
+    handball: {
+      item: 'hball', bang: 'БРОСОК!', caught: 'МЯЧ ПОЙМАН', many: n => `мячей: ${n}`, board: 'rt_board_medvedi',
+      club: 'ГК «Чеховские медведи»', mark: 'assets/medvedi-bear.svg', thing: 'мяч', things: 'мяч «Медведей»',
+      seed: [['krylyshko', 4820], ['medvedi_50', 4310], ['chekhov_fan', 3950], ['nozhka_pro', 3420], ['semimetrovy', 2980],
+        ['bucket_boy', 2470], ['gandbol_ru', 1990], ['metelitsa', 1540]],
+      title: 'Ростикс × Чеховские медведи',
+      text: {
+        collab: 'Коллаб сезона<b>ГК «Чеховские медведи», Чехов</b>',
+      },
+    },
+  };
+  const SPORT = ['akron', 'basketball', 'handball'].find(t => TAGS.includes(t)) || 'handball', SK = SPORTS[SPORT];
+  const BALL = SPORT === 'akron', BB = SPORT === 'basketball', HB = SPORT === 'handball', ROUND = SK.item !== 'puck';
+  if (SK.title) {
+    document.title = SK.title; document.documentElement.dataset.sport = SPORT;
+    for (const [k, v] of Object.entries(SK.text)) if (v) document.querySelector(`[data-s="${k}"]`).innerHTML = v;
+  }
+
+  function board() { return store.get(SK.board, SK.seed.map(([n, s]) => ({ n, s }))); }
+  function addScore(s) {
+    const b = board(); const me = b.find(r => r.me);
+    if (me) { if (s > me.s) me.s = s; } else b.push({ n: 'ты', s, me: true });
+    b.sort((x, y) => y.s - x.s); store.set(SK.board, b); return b;
+  }
+
+  // ---------- палитра рисунка ----------
+  const C = {
+    red: '#ef2e30', redHi: '#ff5b52', redDk: '#c4202a', ink: '#1d1a1a', line: '#3a2212',
+    bun: '#eba13d', bunHi: '#f8c977', crisp: '#cd7a2e', crispHi: '#eeac5a', crispDk: '#9c5521',
+    bone: '#f8f0e2', ice: '#f2f7fa', rink: '#2d62c6', gold: '#f6b81c', goldDk: '#8d5c00', dot: '#e8410f',
+  };
+
+  // логотип Трактора с сайта клуба, для шайбы: силуэт медведя белым, прорези чёрным
+  const LOGO = new Image();
+  LOGO.src = 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 594 530">' +
+    '<path fill="#fff" d="M566.794 202.994L505.687 162.468L505.567 130.791L428.856 79.9465L418.199 54.444L356.468 29.1426L309.919 48.6315L187.765 49.074L150.466 33.7885L74.3582 65.6466L51.9382 120.352L73.9762 173.027L29.1361 282.478L73.2121 387.827L110.451 372.24L138.964 440.361L194.823 416.97L215.534 466.446L268.196 444.403L278.431 468.84L356.448 500.839L433.501 468.578L462.416 398.044L424.794 413.792L412.649 384.79L474.782 322.2L486.907 351.202L567.056 270.451L566.794 202.994Z"/>' +
+    '<path fill="#141414" d="M364.633 460.554L309.115 437.827L289.752 391.569L307.688 347.804L342.554 431.15L383.634 413.954L364.633 460.554ZM460.224 254.744L493.744 276.968L440.76 299.092L388.742 351.585L388.52 289.015L343.982 259.49L291.32 281.614L237.19 413.712L215.072 361.038L256.534 259.893L203.872 282.016L160.56 387.707L138.442 335.033L169.066 260.295L116.404 282.419L94.7478 335.254L72.6294 282.579L99.5334 216.912L152.195 194.789L134.259 238.553L239.603 194.467L221.667 238.232L327.212 193.964L335.094 174.737L354.317 182.621L397.951 164.359L310.422 128.478L292.486 172.263L239.824 194.387L257.76 150.622L152.417 194.708L170.373 150.843L205.481 136.141L150.768 113.716L132.409 121.399L148.496 159.974L117.65 172.886L95.532 120.212L105.264 96.4392L150.506 77.4933L218.028 105.188L224.523 89.3395L317.983 88.9976L356.529 72.9077L387.314 85.5182L396.262 106.898L464.367 152.05L435.17 164.278L528.771 226.345L471.726 226.546L460.224 254.744Z"/></svg>');
+
+  // бренд на поле и на упаковке: знак Ростикса (Википедия), R — вектор из иконки приложения Ростикс (зелёная — для газона), лого клубов с их сайтов
+  const IMG = {};
+  for (const [k, f] of Object.entries({ r: 'rostics-r.svg', logo: 'rostics-logo.png', word: 'rostics-word-white.png', traktor: 'traktor-logo.svg', akron: 'akron-logo.svg', rGreen: 'rostics-r-green.svg', avtodor: 'avtodor-logo.png', bear: 'medvedi-bear.svg' })) {
+    const i = new Image(); i.src = 'assets/' + f; i.onload = () => paintLegend(); IMG[k] = i;
+  }
+  const ok = i => i.complete && i.naturalWidth > 0;
+
+  // ---------- рисунки предметов: центр в 0,0, ширина ~44 ----------
+  function rr(c, x, y, w, h, r) { c.beginPath(); c.roundRect(x, y, w, h, r); }
+  function paint(c, fill, stroke = true) { c.fillStyle = fill; c.fill(); if (stroke) c.stroke(); }
+  function dotAt(c, x, y, r, fill) { c.beginPath(); c.arc(x, y, r, 0, 7); c.fillStyle = fill; c.fill(); }
+  const DRAW = {
+    burger(c) {
+      rr(c, -20, 5, 40, 11, [2, 2, 6, 6]); paint(c, C.bun);
+      rr(c, -22, -2, 44, 9, 4.5); paint(c, '#5c2e15');
+      c.beginPath(); c.moveTo(-21, -3); c.lineTo(21, -3); c.lineTo(17, 3); c.lineTo(9, -1); c.lineTo(3, 6); c.lineTo(-5, -1); c.lineTo(-14, 4); c.closePath(); paint(c, '#ffc83a');
+      c.beginPath(); c.moveTo(-23, -8);
+      for (let i = 0; i <= 8; i++) c.lineTo(-23 + i * 5.75, i % 2 ? -2 : -5);
+      c.lineTo(23, -8); c.closePath(); paint(c, '#5fb83a');
+      c.beginPath(); c.moveTo(-21, -6); c.bezierCurveTo(-22, -26, 22, -26, 21, -6); c.closePath(); paint(c, C.bun);
+      c.beginPath(); c.ellipse(-8, -16, 6.5, 2.8, -.45, 0, 7); c.fillStyle = C.bunHi; c.fill();
+      for (const [x, y] of [[-3, -18], [6, -16], [12, -11], [-13, -11], [2, -11]]) { c.beginPath(); c.ellipse(x, y, 1.9, 1.1, .3, 0, 7); c.fillStyle = '#fff6e2'; c.fill(); }
+    },
+    leg(c) {
+      c.beginPath(); c.arc(22, -4.5, 4.6, 0, 7); paint(c, C.bone);
+      c.beginPath(); c.arc(22, 4.5, 4.6, 0, 7); paint(c, C.bone);
+      rr(c, 4, -3.6, 19, 7.2, 3); c.fillStyle = C.bone; c.fill();
+      c.beginPath(); c.moveTo(4, -3.6); c.lineTo(19, -3.6); c.moveTo(4, 3.6); c.lineTo(19, 3.6); c.stroke();
+      c.beginPath(); c.moveTo(9, -6); c.bezierCurveTo(2, -19, -24, -19, -23, -1); c.bezierCurveTo(-22, 16, 3, 15, 9, 6); c.quadraticCurveTo(11, 0, 9, -6); c.closePath(); paint(c, C.crisp);
+      for (const [x, y, r] of [[-15, -8, 3.4], [-7, -11, 3], [-17, 3, 3], [-9, 6, 2.6], [0, -5, 2.4], [-3, 3, 2.2], [-12, -2, 2]]) dotAt(c, x, y, r, C.crispHi);
+      c.beginPath(); c.moveTo(-18, 9); c.quadraticCurveTo(-8, 14, 4, 8); c.strokeStyle = C.crispDk; c.stroke(); c.strokeStyle = C.line;
+    },
+    fries(c) {
+      // палочки веером за коробкой, как на карточке меню Ростикса
+      c.lineWidth = 1.2; c.strokeStyle = '#d29a22';
+      for (const [x, a, l] of [[-13, -.32, 22], [-8, -.16, 27], [-3, -.05, 29], [2, .08, 28], [7, .2, 26], [12, .34, 21], [-10, .05, 24], [5, -.1, 25], [0, .15, 30]]) {
+        c.save(); c.translate(x, -4); c.rotate(a); rr(c, -2.2, -l, 4.4, l, 1.6); c.fillStyle = '#f7d052'; c.fill(); c.stroke();
+        c.fillStyle = '#ffe58c'; c.fillRect(-1.2, -l + 2, 1.3, l - 6); c.restore();
+      }
+      // коробка: верх вогнутый, к низу уже; по бокам красные клинья, в центре R
+      const box = () => { c.beginPath(); c.moveTo(-18, -10); c.quadraticCurveTo(0, 0, 18, -10); c.lineTo(13, 22); c.quadraticCurveTo(0, 24, -13, 22); c.closePath(); };
+      box(); c.fillStyle = '#fff'; c.fill();
+      c.save(); box(); c.clip(); c.fillStyle = C.red;
+      for (const d of [-1, 1]) { c.beginPath(); c.moveTo(d * 20, -12); c.lineTo(d * 7.5, -5); c.lineTo(d * 13, 6); c.lineTo(d * 6, 24); c.lineTo(d * 20, 24); c.closePath(); c.fill(); }
+      c.restore();
+      if (IMG.r.complete && IMG.r.naturalWidth) c.drawImage(IMG.r, -8.5, 1.5, 17, 13.1);
+      box(); c.lineWidth = 1.6; c.strokeStyle = '#9e1c1c'; c.stroke();
+    },
+    dot(c) { dotAt(c, 0, 0, 16, C.dot); },   // точка из знака «Вкусно — и точка»: плоский круг, без обводки
+    crown(c) {
+      c.strokeStyle = C.goldDk;
+      c.beginPath(); c.moveTo(-17, 10); c.lineTo(-20, -9); c.lineTo(-9, 0); c.lineTo(0, -14); c.lineTo(9, 0); c.lineTo(20, -9); c.lineTo(17, 10); c.closePath(); paint(c, C.gold);
+      rr(c, -17, 4, 34, 6, 1); paint(c, '#e09a08');
+      for (const [x, y] of [[-20, -9], [0, -14], [20, -9]]) { c.beginPath(); c.arc(x, y, 3.2, 0, 7); paint(c, C.gold); }
+      for (const x of [-9, 0, 9]) dotAt(c, x, 7, 1.8, '#d8262b');
+    },
+    // блюда из меню Ростикса (rostics.ru, 26.10): Ростмастер, Шефролл
+    rostmaster(c) {
+      // как на фото меню: лепёшка с подпалинами, свёрнутая кульком, сверху торчит рваная хрустящая курица, салат, перец, соус;
+      // снизу рукав с красными клиньями и R
+      c.beginPath(); c.moveTo(-15, 6); c.lineTo(-18, -13); c.lineTo(-6, -9); c.lineTo(6, -12); c.lineTo(18, -15); c.lineTo(15, 6); c.closePath(); paint(c, '#f2e2bf');
+      for (const [x, y, r] of [[-10, -4, 1.6], [-3, 0, 1.3], [5, -6, 1.8], [11, -1, 1.4], [-12, 3, 1.2], [2, 4, 1.5]]) dotAt(c, x, y, r, '#d4a868');
+      // салат по краям
+      c.fillStyle = '#5fb83a'; c.strokeStyle = C.line;
+      for (const d of [-1, 1]) { c.beginPath(); c.moveTo(d * 8, -12); c.lineTo(d * 20, -20); c.lineTo(d * 16, -14); c.lineTo(d * 22, -12); c.lineTo(d * 15, -9); c.closePath(); c.fill(); c.stroke(); }
+      // курица: бугристый хрустящий комок из мелких неровных кусочков
+      for (const [x, y, rx, ry, a] of [[-10, -15, 5, 4, .4], [-4, -19, 6, 4.5, -.3], [3, -21, 5.5, 4, .5], [9, -17, 5, 4, -.4], [-7, -11, 5, 3.5, .1], [5, -12, 6, 3.5, -.2], [0, -15, 6, 4, 0]]) {
+        c.beginPath(); c.ellipse(x, y, rx, ry, a, 0, 7); paint(c, '#d88a36');
+      }
+      c.fillStyle = '#d88a36'; for (const [x, y, rx, ry, a] of [[-4, -19, 5, 3.5, -.3], [0, -15, 5, 3, 0], [5, -12, 5, 2.5, -.2]]) { c.beginPath(); c.ellipse(x, y, rx, ry, a, 0, 7); c.fill(); }
+      for (const [x, y, r] of [[-9, -16, 1.5], [-3, -20, 1.7], [4, -22, 1.4], [9, -18, 1.5], [-1, -14, 1.3], [6, -13, 1.2], [-7, -12, 1.1]]) dotAt(c, x, y, r, '#f2b860');
+      // перец, сыр, соус
+      c.beginPath(); c.moveTo(-8, -12); c.lineTo(-3, -16); c.lineTo(-1, -11); c.closePath(); c.fillStyle = '#e2392b'; c.fill();
+      c.beginPath(); c.moveTo(4, -11); c.lineTo(9, -15); c.lineTo(10, -10); c.closePath(); c.fillStyle = '#f6c13a'; c.fill();
+      c.strokeStyle = '#fffaf0'; c.lineWidth = 1.6; c.beginPath(); c.moveTo(-10, -16); c.quadraticCurveTo(-2, -13, 4, -18); c.quadraticCurveTo(8, -21, 12, -16); c.stroke();
+      c.strokeStyle = C.line; c.lineWidth = 2;
+      const sleeve = () => { c.beginPath(); c.moveTo(-16, 3); c.lineTo(16, 3); c.lineTo(13, 26); c.lineTo(-13, 26); c.closePath(); };
+      sleeve(); c.fillStyle = '#fff'; c.fill();
+      c.save(); sleeve(); c.clip(); c.fillStyle = C.red;
+      for (const d of [-1, 1]) { c.beginPath(); c.moveTo(d * 18, 1); c.lineTo(d * 11, 1); c.lineTo(d * 14, 14); c.lineTo(d * 10, 28); c.lineTo(d * 18, 28); c.closePath(); c.fill(); }
+      c.restore();
+      if (IMG.r.complete && IMG.r.naturalWidth) c.drawImage(IMG.r, -7.5, 8.5, 15, 11.6);
+      sleeve(); c.lineWidth = 1.6; c.strokeStyle = '#9e1c1c'; c.stroke();
+    },
+    shefroll(c) {
+      // как на фото меню: ролл по диагонали, слева раскрытый конец с начинкой, справа бумага с двумя красными полосами и R
+      c.save(); c.rotate(-.42);
+      const tube = () => { c.beginPath(); c.moveTo(-16, -8); c.lineTo(22, -8); c.quadraticCurveTo(27, 0, 22, 8); c.lineTo(-16, 8); c.closePath(); };
+      tube(); paint(c, '#f2e2bf');
+      c.save(); tube(); c.clip();
+      dotAt(c, -8, 3, 1.4, '#d4a868'); dotAt(c, -2, -4, 1.2, '#d4a868');
+      c.fillStyle = '#fff'; c.beginPath(); c.moveTo(3, -10); c.lineTo(30, -10); c.lineTo(30, 10); c.lineTo(-1, 10); c.closePath(); c.fill();
+      c.fillStyle = C.red; for (const x of [6, 20]) { c.beginPath(); c.moveTo(x, -10); c.lineTo(x + 5, -10); c.lineTo(x + 1, 10); c.lineTo(x - 4, 10); c.closePath(); c.fill(); }
+      c.restore();
+      if (IMG.r.complete && IMG.r.naturalWidth) c.drawImage(IMG.r, 9, -5, 12, 9.3);
+      tube(); c.lineWidth = 2; c.strokeStyle = C.line; c.stroke();
+      // раскрытый конец: салат бахромой, курица, соус
+      c.beginPath(); c.moveTo(-16, -9);
+      for (const [x, y] of [[-21, -13], [-20, -7], [-26, -6], [-22, -1], [-27, 4], [-21, 6], [-22, 12], [-16, 9]]) c.lineTo(x, y);
+      c.closePath(); paint(c, '#5fb83a');
+      c.beginPath(); c.ellipse(-17, 0, 5, 7.5, 0, 0, 7); paint(c, '#d88a36');
+      c.strokeStyle = '#f2b860'; c.lineWidth = 1.3; c.beginPath(); c.moveTo(-19, -4); c.lineTo(-16, 2); c.moveTo(-15, -5); c.lineTo(-14, 0); c.stroke();
+      dotAt(c, -19, 4, 1.8, '#e2392b'); c.strokeStyle = '#fffaf0'; c.lineWidth = 1.4; c.beginPath(); c.moveTo(-21, -2); c.quadraticCurveTo(-17, 1, -13, -3); c.stroke();
+      c.restore();
+    },
+    puck(c) {
+      dotAt(c, 0, 2.5, 19, '#000');
+      dotAt(c, 0, 0, 19, '#1a1a1a');
+      c.beginPath(); c.arc(0, 0, 16.5, 0, 7); c.strokeStyle = '#3d3d3d'; c.lineWidth = 1.5; c.stroke();
+      if (LOGO.complete && LOGO.naturalWidth) c.drawImage(LOGO, -13, -11.6, 26, 23.2);
+      c.beginPath(); c.arc(0, 0, 18, -2.6, -1.6); c.strokeStyle = 'rgba(255,255,255,.22)'; c.lineWidth = 2; c.stroke();
+    },
+    // мяч Акрона: белый, чёрные пятиугольники по краю, в центре знак клуба (fcakron.ru)
+    ball(c) {
+      const R = 19, ball = () => { c.beginPath(); c.arc(0, 0, R, 0, 7); };
+      ball(); c.fillStyle = '#fff'; c.fill();
+      c.save(); ball(); c.clip();
+      c.lineWidth = 1.4; c.strokeStyle = '#2a2a2a';
+      for (let i = 0; i < 5; i++) {
+        const a = -Math.PI / 2 + Math.PI / 5 + i * Math.PI * 2 / 5;
+        c.beginPath(); c.moveTo(Math.cos(a) * 10.5, Math.sin(a) * 10.5); c.lineTo(Math.cos(a) * 15, Math.sin(a) * 15); c.stroke();
+        c.beginPath();
+        for (let j = 0; j < 5; j++) { const b = a + Math.PI + j * Math.PI * 2 / 5, px = Math.cos(a) * 20 + Math.cos(b) * 6.4, py = Math.sin(a) * 20 + Math.sin(b) * 6.4; j ? c.lineTo(px, py) : c.moveTo(px, py); }
+        c.closePath(); c.fillStyle = '#1d1a1a'; c.fill();
+      }
+      c.beginPath(); c.arc(5, 6, 22, 0, 7); c.fillStyle = 'rgba(30,40,60,.08)'; c.fill();
+      c.restore();
+      if (ok(IMG.akron)) { c.beginPath(); c.arc(0, 0, 10.5, 0, 7); c.fillStyle = '#fff'; c.fill(); c.drawImage(IMG.akron, -10.5, -10.5, 21, 21); }
+      ball(); c.lineWidth = 1.8; c.strokeStyle = '#1d1a1a'; c.stroke();
+    },
+    // баскетбольный мяч Автодора: оранжевый, чёрные швы, в центре знак клуба
+    bball(c) {
+      const R = 19, ball = () => { c.beginPath(); c.arc(0, 0, R, 0, 7); };
+      ball(); c.fillStyle = '#ef7a22'; c.fill();
+      c.save(); ball(); c.clip();
+      c.beginPath(); c.arc(6, 7, 22, 0, 7); c.fillStyle = 'rgba(120,40,0,.16)'; c.fill();
+      c.lineWidth = 1.7; c.strokeStyle = '#2a1406';
+      c.beginPath(); c.moveTo(0, -R); c.lineTo(0, R); c.moveTo(-R, 0); c.lineTo(R, 0);
+      for (const d of [-1, 1]) { c.moveTo(d * R * .66, -R); c.quadraticCurveTo(d * R * .18, 0, d * R * .66, R); }
+      c.stroke(); c.restore();
+      if (ok(IMG.avtodor)) { c.beginPath(); c.arc(0, 0, 11.5, 0, 7); c.fillStyle = '#fff'; c.fill(); c.drawImage(IMG.avtodor, -12.4, -11.3, 24.8, 22.6); }
+      ball(); c.lineWidth = 1.8; c.strokeStyle = '#2a1406'; c.stroke();
+    },
+    // гандбольный мяч «Медведей»: белый с красной и синей дугами, в центре медведь клуба
+    hball(c) {
+      const R = 18, ball = () => { c.beginPath(); c.arc(0, 0, R, 0, 7); };
+      ball(); c.fillStyle = '#fff'; c.fill();
+      c.save(); ball(); c.clip();
+      c.lineWidth = 7; c.strokeStyle = '#e0262b'; c.beginPath(); c.arc(-R * 1.15, -R * 1.05, R * 1.3, 0, 7); c.stroke();
+      c.strokeStyle = '#1f4fb5'; c.beginPath(); c.arc(R * 1.2, R * 1.1, R * 1.3, 0, 7); c.stroke();
+      c.lineWidth = 1.2; c.strokeStyle = 'rgba(0,0,0,.35)'; c.beginPath(); c.arc(-R * 1.15, R * 1.2, R * 1.35, 0, 7); c.stroke();
+      c.beginPath(); c.arc(5, 6, 22, 0, 7); c.fillStyle = 'rgba(30,40,60,.08)'; c.fill();
+      c.restore();
+      if (ok(IMG.bear)) { c.beginPath(); c.arc(0, 0, 10.5, 0, 7); c.fillStyle = '#fff'; c.fill(); c.drawImage(IMG.bear, -9.5, -9.5, 19, 19); }
+      ball(); c.lineWidth = 1.8; c.strokeStyle = '#1d1a1a'; c.stroke();
+    },
+  };
+  function drawItem(c, k, x, y, rot = 0, sc = 1) {
+    c.save(); c.translate(x, y); c.rotate(rot); c.scale(sc, sc);
+    c.lineWidth = 2; c.strokeStyle = C.line; c.lineJoin = 'round'; c.lineCap = 'round';
+    DRAW[k === 'puck' ? SK.item : k](c); c.restore();
+  }
+  const KIND = {
+    burger: { pts: 10, w: .22, r: 22 }, leg: { pts: 15, w: .2, r: 21 }, fries: { pts: 20, w: .2, r: 22 },
+    rostmaster: { pts: 25, w: .18, r: 22 }, shefroll: { pts: 20, w: .2, r: 22 },
+    dot: { bad: true, r: 16 }, crown: { bad: true, r: 19 },
+  };
+
+  // ---------- поле ----------
+  const $ = id => document.getElementById(id);
+  const cv = $('c'), ctx = cv.getContext('2d'), wrap = $('wrap');
+  const W = 360; let H = 640, S = 1, DPR = 1;
+  const B_H = 78, B_TOP = 96, B_BOT = 72;     // ведро: высота, ширина верха и дна
+  let B_Y = H - 40;                           // низ ведра
+  const rimY = () => B_Y - B_H;
+  const FINE = matchMedia('(pointer: fine)').matches;
+  if (!FINE) document.querySelectorAll('.touch').forEach(e => e.style.display = 'inline');
+
+  function fit() {
+    const desk = innerWidth >= 1024;
+    const bw = document.body.clientWidth, bh = document.body.clientHeight;
+    let w, h;
+    if (desk) { h = Math.min(bh - 80, 800); w = h * 360 / 800; }
+    else { w = Math.min(bw, bh * 9 / 16); h = Math.min(bh, w * 20 / 9); }
+    if (!(w > 0 && h > 0)) return;          // окно ещё не разложено — поле остаётся прежним
+    wrap.style.width = w + 'px'; wrap.style.height = h + 'px';
+    S = w / W; H = h / S; B_Y = H - Math.max(36, H * .06);
+    document.documentElement.style.setProperty('--u', S + 'px');
+    // стартовый экран в мерах кадра Figma 390×844: по ширине, а на низком экране — чтобы собранный к низу блок (654) влез
+    document.documentElement.style.setProperty('--f', Math.min(w / 390, (h - 24) / 654) + 'px');
+    DPR = Math.min(2.5, devicePixelRatio || 1);
+    cv.width = Math.round(w * DPR); cv.height = Math.round(h * DPR);
+  }
+
+  // поля «только линиями» (слово Антона 27.10, вариант А): почти белый фон у всех, разметка линиями цвета своего вида спорта
+  const FIELD = '#faf9f6', LC = { traktor: '#2d62c6', akron: '#3a9a3a', basketball: '#e07a2c', handball: '#2f6fd0' }[SPORT];
+  // центральная линия двумя отрезками — обрывается у внешнего края центрального кольца, внутрь круга с R не заходит
+  function midLine(x1, x2, mid, r) {
+    ctx.beginPath(); ctx.moveTo(x1, mid); ctx.lineTo(W / 2 - r, mid); ctx.moveTo(W / 2 + r, mid); ctx.lineTo(x2, mid); ctx.stroke();
+  }
+  function lines() { ctx.fillStyle = FIELD; ctx.fillRect(0, 0, W, H); ctx.strokeStyle = LC; ctx.lineWidth = 3; }
+  // хоккей: две синие линии, красная центральная и красный центральный круг; R и Трактор полупрозрачные
+  function drawIce() {
+    const mid = H * .5, b1 = H * .29, b2 = H * .71;
+    ctx.save(); lines();
+    for (const y of [b1 + 4, b2 + 4]) { ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(W, y); ctx.stroke(); }
+    ctx.strokeStyle = C.red; midLine(0, W, mid, 71.5);
+    ctx.beginPath(); ctx.arc(W / 2, mid, 70, 0, 7); ctx.fillStyle = 'rgba(255,255,255,.5)'; ctx.fill(); ctx.stroke();
+    ctx.globalAlpha = .5;
+    if (ok(IMG.r)) { const zw = 100, zh = zw * 170 / 220; ctx.drawImage(IMG.r, W / 2 - zw / 2, mid - zh / 2, zw, zh); }
+    if (ok(IMG.traktor)) { const tw = 100, th = tw * 530 / 594; ctx.drawImage(IMG.traktor, W / 2 - tw / 2, (b1 + 64) / 2 - th / 2 + 8, tw, th); }
+    ctx.restore();
+    drawBoards();
+  }
+  // футбол Акрона: разметка поля, R зелёным на белом круге, знак клуба цветом линий в верхней половине
+  function drawGrass() {
+    const mid = H * .5, L = BOARD + 10, Rx = W - BOARD - 10;
+    ctx.save(); lines();
+    ctx.strokeRect(L, -10, Rx - L, H + 20);
+    midLine(L, Rx, mid, 67.5);
+    ctx.beginPath(); ctx.arc(W / 2, mid, 66, 0, 7); ctx.stroke();
+    // штрафные и вратарские у обоих краёв, дуги штрафных
+    for (const [y0, s] of [[0, 1], [H, -1]]) {
+      const box = H * .16, small = H * .06, spot = H * .115;
+      ctx.strokeRect(W / 2 - 108, y0, 216, s * box);
+      ctx.strokeRect(W / 2 - 50, y0, 100, s * small);
+      const a = Math.acos((box - spot) / 50);
+      ctx.beginPath(); ctx.arc(W / 2, y0 + s * spot, 50, s > 0 ? Math.PI / 2 - a : -Math.PI / 2 - a, s > 0 ? Math.PI / 2 + a : -Math.PI / 2 + a); ctx.stroke();
+      dotAt(ctx, W / 2, y0 + s * spot, 3, LC);
+    }
+    ctx.restore();
+    centerR(mid, IMG.rGreen);   // R зелёным — слово Антона 26.10
+    const ak = paintInk('akron', LC);
+    if (ak) { const top = H * .115 + 50, bot = mid - 66, y = (top + bot) / 2, d = Math.min(80, bot - top - 20); ctx.save(); ctx.globalAlpha = .6; ctx.drawImage(ak, W / 2 - d / 2, y - d / 2, d, d); ctx.restore(); }
+    drawBoards();
+  }
+  // силуэт картинки одним цветом (знак клуба «нанесён» на поле) — один раз на картинку и цвет
+  const INK = {};
+  function paintInk(k, col) {
+    if (INK[k + col]) return INK[k + col];
+    const im = IMG[k]; if (!ok(im)) return null;
+    const cv2 = document.createElement('canvas'); cv2.width = 440; cv2.height = Math.round(440 * im.naturalHeight / im.naturalWidth);
+    const c = cv2.getContext('2d'); c.drawImage(im, 0, 0, cv2.width, cv2.height);
+    c.globalCompositeOperation = 'source-in'; c.fillStyle = col; c.fillRect(0, 0, cv2.width, cv2.height);
+    return INK[k + col] = cv2;
+  }
+  // R Ростикса в центральном круге — на белом круге (выбор Антона 26.10, вариант 1 из 8)
+  function centerR(mid, im = IMG.r) {
+    ctx.beginPath(); ctx.arc(W / 2, mid, 60, 0, 7); ctx.fillStyle = '#fff'; ctx.fill();
+    if (ok(im)) { const zw = 98, zh = zw * 16.15 / 20.8; ctx.drawImage(im, W / 2 - zw / 2, mid - zh / 2, zw, zh); }
+  }
+  // баскетбол Автодора: трёхочковые дуги, зоны под кольцом, кольца; знак клуба в цвете в верхней половине
+  function drawParquet() {
+    const mid = H * .5, L = BOARD + 10, Rx = W - BOARD - 10;
+    ctx.save(); lines();
+    ctx.strokeRect(L, -10, Rx - L, H + 20);
+    midLine(L, Rx, mid, 67.5);
+    ctx.beginPath(); ctx.arc(W / 2, mid, 66, 0, 7); ctx.stroke();
+    for (const [y0, s] of [[0, 1], [H, -1]]) {
+      const hoop = y0 + s * H * .055, key = H * .2;
+      ctx.strokeRect(W / 2 - 62, y0, 124, s * key);
+      ctx.beginPath(); ctx.arc(W / 2, y0 + s * key, 50, 0, 7); ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(W / 2 - 140, y0); ctx.lineTo(W / 2 - 140, hoop); ctx.arc(W / 2, hoop, 140, Math.PI, s > 0 ? 0 : 2 * Math.PI, s > 0); ctx.lineTo(W / 2 + 140, y0); ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(W / 2 - 28, y0 + s * H * .03); ctx.lineTo(W / 2 + 28, y0 + s * H * .03); ctx.lineWidth = 4; ctx.stroke(); ctx.lineWidth = 3;
+      ctx.beginPath(); ctx.arc(W / 2, hoop, 10, 0, 7); ctx.stroke();
+    }
+    ctx.restore();
+    centerR(mid);
+    if (ok(IMG.avtodor)) {
+      const top = Math.max(H * .055 + 140, H * .2 + 50), bot = mid - 66, y = (top + bot) / 2, dh = Math.min(96, bot - top - 12), dw = dh * 440 / 401;
+      ctx.drawImage(IMG.avtodor, W / 2 - dw / 2, y - dh / 2, dw, dh);
+    }
+    drawBoards();
+  }
+  // гандбол «Медведей»: зоны вратаря (6 м), пунктир 9 м, отметка 7 м, ворота рамкой; медведь клуба цветом линий
+  function drawHandCourt() {
+    const mid = H * .5, L = BOARD + 10, Rx = W - BOARD - 10, P = 24;
+    const zone = (y0, s, r) => {
+      ctx.beginPath(); ctx.moveTo(W / 2 - P - r, y0);
+      ctx.arc(W / 2 - P, y0, r, Math.PI, s > 0 ? Math.PI / 2 : 1.5 * Math.PI, s > 0);
+      ctx.lineTo(W / 2 + P, y0 + s * r);
+      ctx.arc(W / 2 + P, y0, r, s > 0 ? Math.PI / 2 : 1.5 * Math.PI, s > 0 ? 0 : 2 * Math.PI, s > 0);
+    };
+    ctx.save(); lines();
+    for (const [y0, s] of [[0, 1], [H, -1]]) {
+      zone(y0, s, 94); ctx.stroke();
+      ctx.setLineDash([10, 8]); zone(y0, s, 141); ctx.stroke(); ctx.setLineDash([]);
+      ctx.beginPath(); ctx.moveTo(W / 2 - 8, y0 + s * 110); ctx.lineTo(W / 2 + 8, y0 + s * 110); ctx.stroke();
+      ctx.strokeRect(W / 2 - P, y0, 2 * P, s * 6);
+    }
+    ctx.strokeRect(L, -10, Rx - L, H + 20);
+    midLine(L, Rx, mid, 60);
+    ctx.restore();
+    centerR(mid);
+    const bear = paintInk('bear', LC);
+    if (bear) { const top = 141 + 12, bot = mid - 66, y = (top + bot) / 2, d = Math.min(104, bot - top - 12); ctx.save(); ctx.globalAlpha = .7; ctx.drawImage(bear, W / 2 - d / 2, y - d / 2, d, d); ctx.restore(); }
+    drawBoards();
+  }
+  const drawField = () => (BALL ? drawGrass : BB ? drawParquet : HB ? drawHandCourt : drawIce)();
+
+  // борта: красная реклама Ростикса по обеим сторонам поля
+  const BOARD = 14;
+  function drawBoards() {
+    for (const side of [0, 1]) {
+      const x = side ? W - BOARD : 0;
+      ctx.fillStyle = C.red; ctx.fillRect(x, 0, BOARD, H);
+      ctx.fillStyle = 'rgba(0,0,0,.08)'; ctx.fillRect(side ? x - 4 : BOARD, 0, 4, H);
+      ctx.fillStyle = '#fff'; ctx.fillRect(side ? x : BOARD - 2, 0, 2, H);
+      if (!ok(IMG.word)) continue;
+      const ww = 96, wh = ww * 38 / 300;
+      for (let y = 30; y < H; y += 150) {
+        ctx.save(); ctx.translate(x + BOARD / 2 + (side ? 1 : -1), y + ww / 2); ctx.rotate(side ? Math.PI / 2 : -Math.PI / 2);
+        ctx.drawImage(IMG.word, -ww / 2, -wh / 2, ww, wh); ctx.restore();
+      }
+    }
+  }
+
+  // ---------- ведро с пиксельным лицом, как на экране приложения ----------
+  const FACE = {
+    eye: ['XX', 'XX'], blink: ['XX'], x: ['X.X', '.X.', 'X.X'], happy: ['.X.', 'X.X'],
+    smile: ['X.....X', '.XXXXX.'], frown: ['.XXXXX.', 'X.....X'], wow: ['.XXX.', 'X...X', '.XXX.'],
+  };
+  function pix(c, pat, cx, cy, cell) {
+    const w = pat[0].length * cell, h = pat.length * cell;
+    pat.forEach((row, j) => [...row].forEach((ch, i) => { if (ch === 'X') c.fillRect(cx - w / 2 + i * cell, cy - h / 2 + j * cell, cell + .4, cell + .4); }));
+  }
+  const bucket = { x: W / 2, tx: W / 2, vx: 0, tilt: 0, squash: 0, sad: 0, joy: 0, wow: 0, blink: 3 };
+  function drawBucket(c = ctx, b = bucket, by = B_Y) {
+    c.save(); c.fillStyle = BALL ? 'rgba(0,40,0,.22)' : BB ? 'rgba(70,30,0,.2)' : HB ? 'rgba(0,20,60,.25)' : 'rgba(30,60,90,.13)'; c.beginPath(); c.ellipse(b.x, by + 4, B_BOT / 2 + 8, 7, 0, 0, 7); c.fill(); c.restore();
+    c.save(); c.translate(b.x, by); c.rotate(b.tilt);
+    const sq = b.squash; c.scale(1 + sq * .07, 1 - sq * .09);
+    const tw = B_TOP / 2, bw = B_BOT / 2, h = B_H;
+    const g = c.createLinearGradient(-tw, 0, tw, 0);
+    g.addColorStop(0, C.redHi); g.addColorStop(.45, C.red); g.addColorStop(1, C.redDk);
+    c.beginPath(); c.moveTo(-tw, -h); c.lineTo(tw, -h); c.lineTo(bw, -6); c.quadraticCurveTo(bw - 1, 0, bw - 7, 0);
+    c.lineTo(-bw + 7, 0); c.quadraticCurveTo(-bw + 1, 0, -bw, -6); c.closePath(); c.fillStyle = g; c.fill();
+    c.fillStyle = 'rgba(255,255,255,.12)'; c.beginPath(); c.moveTo(-tw + 8, -h + 8); c.lineTo(-tw + 16, -h + 8); c.lineTo(-bw + 12, -8); c.lineTo(-bw + 6, -8); c.closePath(); c.fill();
+    // лицо
+    c.fillStyle = '#fff'; const cell = 4.2, ey = -h * .55, my = -h * .27;
+    const eye = b.sad > 0 ? FACE.x : b.wow > 0 ? FACE.wow : b.joy > 0 ? FACE.happy : b.blink < .12 ? FACE.blink : FACE.eye;
+    pix(c, eye, -15, ey, cell); pix(c, eye, 15, ey, cell);
+    pix(c, b.sad > 0 ? FACE.frown : FACE.smile, 0, my, cell);
+    // кромка
+    c.beginPath(); c.ellipse(0, -h, tw + 4, 9, 0, 0, 7); c.fillStyle = '#fbf8f2'; c.fill(); c.strokeStyle = '#e3dccf'; c.lineWidth = 1.5; c.stroke();
+    c.beginPath(); c.ellipse(0, -h + 1.5, tw - 3, 5.5, 0, 0, 7); c.fillStyle = '#e4d9c7'; c.fill();
+    c.restore();
+  }
+
+  // ---------- состояние ----------
+  let mode = 'menu', score = 0, lives = 3, T = 0, spawnT = 0, items = [], fx = [], parts = [], shake = 0, flash = 0, dying = 0;
+  let puck = null, puckT = 0, pucks = 0, keys = { l: false, r: false };
+  const rnd = (a, b) => a + Math.random() * (b - a);
+  function newGame() {
+    score = 0; lives = 3; T = 0; spawnT = .6; items = []; fx = []; parts = []; puck = null; pucks = 0; dying = 0;
+    puckT = SHOT ? 1.2 : rnd(9, 16);   // #shot — шайба сразу, для показа
+    Object.assign(bucket, { sad: 0, joy: 0, wow: 0, squash: 0 });
+    hud();
+  }
+  const FOOD = ['burger', 'leg', 'fries', 'rostmaster', 'shefroll'];
+  function pickKind() {
+    const badP = Math.min(.36, .18 + T * .004);
+    if (Math.random() < badP) return Math.random() < .5 ? 'dot' : 'crown';
+    let r = Math.random();
+    for (const k of FOOD) { r -= KIND[k].w; if (r <= 0) return k; }
+    return 'burger';
+  }
+  function spawn(demo) {
+    const k = demo ? (Math.random() < .2 ? (Math.random() < .5 ? 'dot' : 'crown') : FOOD[Math.random() * FOOD.length | 0]) : pickKind();
+    const sp = demo ? rnd(90, 130) : Math.min(420, 150 + T * 4.2) + rnd(-20, 40);
+    const up = k === 'fries' || k === 'rostmaster';   // в коробке и рукаве падают почти стоя, иначе высыпается
+    items.push({ k, x: rnd(BOARD + 32, W - BOARD - 32), y: -30, py: -30, vy: sp, rot: up ? rnd(-.2, .2) : rnd(-.6, .6), vr: up ? rnd(-.35, .35) : rnd(-1.6, 1.6) });
+  }
+  const interval = () => Math.max(.34, .95 - T * .011);
+
+  // ---------- шайба: замах клюшкой, щелчок, полёт ----------
+  const WIND = 1.45, SLIDE = .3, AIM = .55, PUCK_V = 980;
+  function startPuck() {
+    const dir = Math.random() < .5 ? 1 : -1;            // 1 — бьют слева, -1 — справа
+    const x0 = dir > 0 ? (HB ? 96 : 70) : W - (HB ? 96 : 70), y0 = Math.max(200, H * .3);
+    const tx = dir > 0 ? rnd(W * .45, W - BOARD - 44) : rnd(BOARD + 44, W * .55);
+    puck = { ph: 'wind', t: 0, dir, x0, y0, x: x0, y: y0, tx, ty: rimY(), vx: 0, vy: 0, rot: 0, trail: [], ft: 0 };
+    puck.hx = dir > 0 ? 4 : W - 4; puck.hy = y0 - 92;    // руки хоккеиста у края поля, клюшка видна целиком
+    if (BALL) { puck.hx = x0 - dir * 76; puck.hy = y0 - 58; }   // футбол: бедро за бровкой, видны голень и бутса
+    if (HB) { puck.hx = x0 - dir * 19.8; puck.hy = y0 + 71.3; }  // гандбол: мяч сам идёт дугой замаха вокруг невидимого плеча; без руки (слово Антона 27.10)
+  }
+  // полёт мяча с закруткой: по x — равноускоренно (дуга), по y — ровно; к ободу ведра в tx за то же время, что шайба
+  function flight(p) {
+    const dx = p.tx - p.x0, dy = p.ty - p.y0, Tf = Math.hypot(dx, dy) / PUCK_V;
+    const ax = BALL ? p.dir * 8 * 46 / (Tf * Tf) : 0;
+    return { Tf, ax, vx: (dx - ax * Tf * Tf / 2) / Tf, vy: dy / Tf };
+  }
+  const ease = t => 1 - Math.pow(1 - t, 3);
+  function stickAngle(p) {
+    const bx = p.x0 - p.dir * 24, by = p.y0 + 3;
+    let a0 = Math.atan2(by - p.hy, bx - p.hx), L = Math.hypot(bx - p.hx, by - p.hy);
+    const back = BALL ? .7 : .85, through = BALL ? 1.15 : 1.3;
+    if (BALL) { a0 = p.dir > 0 ? .15 : Math.PI - .15; L = 78; }   // в момент удара носок бутсы у мяча
+    if (HB) {                                                       // замах: мяч из опущенного положения назад-вверх, потом бросок
+      const ac = p.dir > 0 ? -1.3 : Math.PI + 1.3, k = ease(Math.min(1, Math.max(0, (p.t - SLIDE) / (WIND - SLIDE - .15))));
+      return { L: 74, a: p.ph === 'wind' ? ac + p.dir * 1.25 * (1 - k) : ac + p.dir * 1.9 * ease(Math.min(1, p.ft / .09)) };
+    }
+    let a;
+    if (p.ph === 'wind') {
+      const k = ease(Math.min(1, Math.max(0, (p.t - SLIDE) / (WIND - SLIDE - .15))));
+      a = a0 - p.dir * back * k + (k > .95 ? Math.sin(p.t * 60) * .015 : 0);
+    } else a = a0 - p.dir * back + p.dir * through * ease(Math.min(1, p.ft / .07));
+    return { a, L };
+  }
+  function drawStick(p) {
+    let alpha = 1;
+    if (p.ph === 'wind') alpha = Math.min(1, p.t / SLIDE);
+    else alpha = Math.max(0, 1 - (p.ft - .25) / .35);
+    if (alpha <= 0) return;
+    const { a, L } = stickAngle(p), c = ctx;
+    const ex = p.hx + Math.cos(a) * L, ey = p.hy + Math.sin(a) * L;
+    c.save(); c.globalAlpha = alpha; c.lineCap = 'round';
+    c.strokeStyle = 'rgba(0,0,0,.12)'; c.lineWidth = 8; c.beginPath(); c.moveTo(p.hx, p.hy + 8); c.lineTo(ex, ey + 8); c.stroke();
+    c.strokeStyle = '#222'; c.lineWidth = 7; c.beginPath(); c.moveTo(p.hx, p.hy); c.lineTo(ex, ey); c.stroke();
+    // крюк: под углом к рукояти, в сторону шайбы
+    const ba = a - p.dir * 1.15, bl = 26;
+    const bx2 = ex + Math.cos(ba) * bl, by2 = ey + Math.sin(ba) * bl;
+    c.lineWidth = 11; c.beginPath(); c.moveTo(ex, ey); c.lineTo(bx2, by2); c.stroke();
+    c.strokeStyle = '#fff'; c.lineWidth = 7; c.setLineDash([3, 3]);
+    c.beginPath(); c.moveTo(ex + Math.cos(ba) * 6, ey + Math.sin(ba) * 6); c.lineTo(ex + Math.cos(ba) * 20, ey + Math.sin(ba) * 20); c.stroke();
+    c.setLineDash([]);
+    c.restore();
+  }
+  // нога футболиста от бровки: красный гетр с белыми полосами, бутса профилем — носок вперёд по ходу удара, шипы на подошве
+  function drawLeg(p) {
+    let alpha = p.ph === 'wind' ? Math.min(1, p.t / SLIDE) : Math.max(0, 1 - (p.ft - .25) / .35);
+    if (alpha <= 0) return;
+    const { a, L } = stickAngle(p), c = ctx, d = p.dir;
+    c.save(); c.globalAlpha = alpha; c.translate(p.hx, p.hy); c.rotate(a);
+    c.lineCap = 'round'; c.lineJoin = 'round';
+    rr(c, -20, -8, L + 14, 16, 7); c.fillStyle = C.red; c.fill(); c.lineWidth = 2; c.strokeStyle = '#7c1015'; c.stroke();
+    c.fillStyle = '#fff'; for (const x of [L - 30, L - 21]) c.fillRect(x, -7, 4.5, 14);
+    // бутса: x — вдоль голени (к подошве), y — вперёд по ходу удара
+    const P = (x, y) => [L + x, d * y];
+    c.beginPath(); c.moveTo(...P(-8, -9)); c.quadraticCurveTo(...P(8, -13), ...P(13, -7));
+    c.lineTo(...P(13, 30)); c.quadraticCurveTo(...P(12, 40), ...P(2, 39)); c.quadraticCurveTo(...P(-4, 36), ...P(-5, 26));
+    c.lineTo(...P(-8, 9)); c.closePath();
+    c.fillStyle = '#1d1a1a'; c.fill(); c.lineWidth = 1.5; c.strokeStyle = '#000'; c.stroke();
+    c.fillStyle = '#fff'; c.beginPath(); c.moveTo(...P(10, -8)); c.lineTo(...P(13, -7)); c.lineTo(...P(13, 31)); c.lineTo(...P(10, 31)); c.closePath(); c.fill();
+    for (const y of [-4, 6, 19, 28]) { c.fillRect(...P(13.5, y - 1.5), 4, 3); }
+    c.strokeStyle = '#fff'; c.lineWidth = 1.6;
+    for (const y of [14, 20, 26]) { c.beginPath(); c.moveTo(...P(-5.5, y - 2)); c.lineTo(...P(-1, y + 1)); c.stroke(); }
+    c.strokeStyle = C.red; c.lineWidth = 2.6; c.beginPath(); c.moveTo(...P(7, -4)); c.quadraticCurveTo(...P(2, 10), ...P(7, 24)); c.stroke();
+    c.restore();
+  }
+  function updatePuck(dt) {
+    const p = puck;
+    if (p.ph === 'wind') {
+      p.t += dt;
+      p.x = p.t < SLIDE ? p.x0 - p.dir * 90 * (1 - ease(p.t / SLIDE)) : p.x0;
+      if (BALL) p.rot = (p.x - p.x0) / 19;            // мяч вкатывается
+      if (HB) { const { a, L } = stickAngle(p); p.x = p.hx + Math.cos(a) * L; p.y = p.hy + Math.sin(a) * L; }   // мяч на дуге замаха
+      p.ty = rimY();
+      if (p.t >= WIND) {
+        p.ph = 'fly'; p.ft = 0;
+        const f = flight(p); Object.assign(p, { vx: f.vx, vy: f.vy, ax: f.ax, Tf: f.Tf });
+        shake = Math.max(shake, .22); flash = Math.max(flash, .5);
+        fx.push({ x: Math.max(80, Math.min(W - 80, p.x0 + p.dir * 30)), y: p.y0 - 36, text: SK.bang, t: 0, life: .8, kind: 'bang' });
+        for (let i = 0; i < 14; i++) { const a = rnd(0, 6.3), v = rnd(120, 320); parts.push({ x: p.x0, y: p.y0, vx: Math.cos(a) * v, vy: Math.sin(a) * v, t: 0, life: rnd(.25, .5), col: BALL ? (i % 3 ? '#8fd16a' : '#fff') : BB ? '#f0c28e' : HB ? '#a9c8f7' : '#cfe3f0', s: rnd(2, 4) }); }
+      }
+      return;
+    }
+    p.ft += dt;
+    if (p.ph !== 'fly') { if (p.ft > .8) puck = null; return; }
+    const py = p.y;
+    p.trail.push([p.x, p.y]); if (p.trail.length > 9) p.trail.shift();
+    p.vx += (p.ax || 0) * dt; p.x += p.vx * dt; p.y += p.vy * dt; p.rot += dt * 22;
+    if (BB && !p.bounced && p.ft >= p.Tf / 2) {       // передача с отскоком: мяч бьётся о паркет на середине пути
+      p.bounced = true;
+      for (let i = 0; i < 10; i++) { const a = rnd(Math.PI, Math.PI * 2), v = rnd(60, 160); parts.push({ x: p.x, y: p.y + 10, vx: Math.cos(a) * v, vy: Math.sin(a) * v * .4, t: 0, life: rnd(.2, .35), col: '#f6dcb8', s: rnd(2, 3.5) }); }
+    }
+    const ry = rimY();
+    if (py < ry + 2 && p.y >= ry + 2 && Math.abs(p.x - bucket.x) < B_TOP / 2 + 2) {
+      p.ph = 'caught'; pucks++; score += 300; hud();
+      bucket.wow = .9; bucket.squash = 1; shake = Math.max(shake, .3);
+      fx.push({ x: bucket.x, y: ry - 40, text: '+300', sub: SK.caught, t: 0, life: 1.2, kind: 'puck' });
+      confetti(bucket.x, ry);
+    } else if (p.y > H + 40 || p.x < -40 || p.x > W + 40) {
+      p.ph = 'miss';
+      fx.push({ x: Math.min(W - 50, Math.max(50, p.tx)), y: ry - 20, text: 'мимо', t: 0, life: .8, kind: 'miss' });
+    }
+  }
+  function drawPuckLayer() {
+    const p = puck, c = ctx;
+    if (p.ph === 'wind' && p.t > WIND - AIM) {        // прицел: куда уйдёт шайба
+      const k = (p.t - (WIND - AIM)) / AIM;
+      c.save(); c.globalAlpha = .25 + .45 * Math.abs(Math.sin(p.t * 18));
+      c.strokeStyle = C.red; c.lineWidth = 2; c.setLineDash([6, 7]); c.lineDashOffset = -p.t * 60;
+      const f = flight(p); c.beginPath(); c.moveTo(p.x0, p.y0);
+      for (let i = 1; i <= 24; i++) { const t = f.Tf * k * i / 24; c.lineTo(p.x0 + f.vx * t + f.ax * t * t / 2, p.y0 + f.vy * t); }
+      c.stroke();
+      c.setLineDash([]); c.beginPath(); c.arc(p.tx, p.ty, 12 * k + 4, 0, 7); c.stroke();
+      c.restore();
+    }
+    if (!ROUND) drawStick(p);
+    if (p.ph === 'wind' || p.ph === 'fly') {
+      p.trail.forEach(([x, y], i) => { c.globalAlpha = (i + 1) / p.trail.length * .35; dotAt(c, x, y, 17 * (i + 3) / (p.trail.length + 3), BB ? '#f39a4a' : ROUND ? '#fff' : '#1a1a1a'); });
+      c.globalAlpha = 1;
+      // мяч в полёте поднимается над полем: тень отстаёт, мяч крупнее к середине полёта
+      const f = p.ph === 'fly' ? Math.min(1, p.ft / p.Tf) : 0;
+      const h = (BALL || HB) && p.ph === 'fly' ? Math.sin(Math.PI * f) : 0;
+      if (BALL || HB) { c.save(); c.fillStyle = BALL ? 'rgba(0,30,0,.25)' : 'rgba(0,20,60,.3)'; c.beginPath(); c.ellipse(p.x + 3 + h * 10, p.y + 14 + h * 18, 16 - h * 4, 6 - h * 1.5, 0, 0, 7); c.fill(); c.restore(); }
+      // баскетбол: в замахе мяч ведут (стучит об пол), в полёте — отскок посередине
+      let lift = 0;
+      if (BB) {
+        lift = p.ph === 'fly' ? Math.abs(Math.cos(Math.PI * f)) * 14 : p.t > SLIDE ? Math.abs(Math.sin((p.t - SLIDE) * 7)) * 16 : 0;
+        c.save(); c.fillStyle = 'rgba(70,30,0,.28)'; c.beginPath(); c.ellipse(p.x + 2, p.y + 16, 15 - lift * .3, 5, 0, 0, 7); c.fill(); c.restore();
+      }
+      drawItem(c, 'puck', p.x, p.y - lift, p.rot, p.ph === 'fly' ? 1.05 + h * .3 : 1);
+    }
+    if (BALL) drawLeg(p);
+  }
+  function confetti(x, y) {
+    for (let i = 0; i < 34; i++) {
+      const a = rnd(-Math.PI * .95, -Math.PI * .05), v = rnd(160, 420);
+      parts.push({ x, y, vx: Math.cos(a) * v, vy: Math.sin(a) * v, t: 0, life: rnd(.7, 1.2), col: i % 3 ? C.red : (i % 2 ? '#fff' : '#1a1a1a'), s: rnd(3, 6), g: 700 });
+    }
+  }
+
+  // ---------- шаг ----------
+  function update(dt) {
+    const play = mode === 'play' && !dying;
+    if (mode === 'play') T += dt;
+    const demo = mode !== 'play';
+    // ведро
+    if (demo) {
+      const food = items.filter(i => !KIND[i.k].bad && i.y < rimY()).sort((a, b) => b.y - a.y)[0];
+      bucket.tx = food ? food.x : W / 2;
+    } else {
+      if (keys.l) bucket.tx -= 560 * dt;
+      if (keys.r) bucket.tx += 560 * dt;
+    }
+    const EDGE = BOARD + 14 + B_TOP / 2;                   // кромка ведра не доходит до борта на 10
+    bucket.tx = Math.max(EDGE, Math.min(W - EDGE, bucket.tx));
+    const prev = bucket.x;
+    bucket.x += (bucket.tx - bucket.x) * Math.min(1, dt * (demo ? 5 : 20));
+    bucket.vx = (bucket.x - prev) / Math.max(dt, .001);
+    const tt = Math.max(-.2, Math.min(.2, bucket.vx * .0005));
+    bucket.tilt += (tt - bucket.tilt) * Math.min(1, dt * 10);
+    bucket.squash = Math.max(0, bucket.squash - dt * 5);
+    for (const k of ['sad', 'joy', 'wow']) bucket[k] = Math.max(0, bucket[k] - dt);
+    bucket.blink -= dt; if (bucket.blink < 0) bucket.blink = rnd(2.5, 5);
+    // появление
+    if (mode !== 'pause' && !dying) {
+      spawnT -= dt;
+      if (spawnT <= 0) { spawn(demo); spawnT = (demo ? 1.1 : interval()) * rnd(.7, 1.3) * (puck ? 1.5 : 1); }
+      if (play) { puckT -= dt; if (puckT <= 0 && !puck) { startPuck(); puckT = rnd(16, 28); } }
+    }
+    // предметы
+    const ry = rimY();
+    for (let i = items.length - 1; i >= 0; i--) {
+      const it = items[i]; it.py = it.y; it.y += it.vy * dt; it.rot += it.vr * dt;
+      if (!dying && it.py < ry + 4 && it.y >= ry + 4 && Math.abs(it.x - bucket.x) < B_TOP / 2 - 2) {
+        items.splice(i, 1); catchItem(it, demo); continue;
+      }
+      if (it.y > H + 40) items.splice(i, 1);
+    }
+    if (puck && !dying) updatePuck(dt);
+    for (let i = fx.length - 1; i >= 0; i--) { fx[i].t += dt; if (fx[i].t > fx[i].life) fx.splice(i, 1); }
+    for (let i = parts.length - 1; i >= 0; i--) {
+      const p = parts[i]; p.t += dt; p.x += p.vx * dt; p.y += p.vy * dt; p.vy += (p.g || 0) * dt; p.vx *= .985;
+      if (p.t > p.life) parts.splice(i, 1);
+    }
+    shake = Math.max(0, shake - dt); flash = Math.max(0, flash - dt * 2.2);
+    if (dying) { dying -= dt; if (dying <= 0) { dying = 0; endAttempt(); } }
+  }
+  function catchItem(it, demo) {
+    const K = KIND[it.k];
+    if (K.bad) {
+      if (demo) { bucket.sad = .6; return; }
+      lives--; bucket.sad = 1; shake = .3; flash = .7;
+      fx.push({ x: bucket.x, y: rimY() - 30, text: '−1 жизнь', t: 0, life: .9, kind: 'bad' });
+      hud(true);
+      if (lives <= 0) dying = 1.1;
+      return;
+    }
+    bucket.joy = .35; bucket.squash = .6;
+    if (demo) return;
+    score += K.pts; hud();
+    fx.push({ x: it.x, y: rimY() - 22, text: '+' + K.pts, t: 0, life: .6, kind: 'pts' });
+    for (let i = 0; i < 6; i++) { const a = rnd(-2.8, -.3), v = rnd(80, 180); parts.push({ x: it.x, y: rimY(), vx: Math.cos(a) * v, vy: Math.sin(a) * v, t: 0, life: rnd(.3, .5), col: C.crispHi, s: rnd(2, 3.5), g: 500 }); }
+  }
+
+  // ---------- кадр ----------
+  function draw() {
+    const c = ctx;
+    c.setTransform(S * DPR, 0, 0, S * DPR, 0, 0);
+    const reduce = matchMedia('(prefers-reduced-motion: reduce)').matches;
+    if (shake > 0 && !reduce) c.translate(rnd(-1, 1) * shake * 14, rnd(-1, 1) * shake * 14);
+    drawField();
+    for (const it of items) drawItem(c, it.k, it.x, it.y, it.rot);
+    if (puck) drawPuckLayer();
+    drawBucket();
+    for (const p of parts) { c.globalAlpha = Math.max(0, 1 - p.t / p.life); c.fillStyle = p.col; c.fillRect(p.x - p.s / 2, p.y - p.s / 2, p.s, p.s); }
+    c.globalAlpha = 1;
+    for (const f of fx) {
+      const k = f.t / f.life, a = k < .7 ? 1 : 1 - (k - .7) / .3;
+      c.save(); c.globalAlpha = a; c.textAlign = 'center'; c.textBaseline = 'middle';
+      if (f.kind === 'bang') {
+        const s = 1 + Math.max(0, .5 - f.t * 4);
+        c.translate(f.x, f.y); c.rotate(-.12 * puckDirSign(f)); c.scale(s, s);
+        c.font = '900 42px "Cera Condensed", "Arial Narrow", sans-serif'; c.lineJoin = 'round';
+        c.lineWidth = 9; c.strokeStyle = '#fff'; c.strokeText(f.text, 0, 0);
+        c.fillStyle = C.red; c.fillText(f.text, 0, 0);
+      } else if (f.kind === 'puck') {
+        const s = 1 + Math.max(0, .6 - f.t * 3);
+        c.translate(f.x, f.y - f.t * 30); c.scale(s, s);
+        c.font = '900 48px "Cera Condensed", "Arial Narrow", sans-serif'; c.lineJoin = 'round';
+        c.lineWidth = 9; c.strokeStyle = '#fff'; c.strokeText(f.text, 0, 0);
+        c.fillStyle = C.red; c.fillText(f.text, 0, 0);
+        c.font = '900 18px "Cera Condensed", "Arial Narrow", sans-serif'; c.lineWidth = 6; c.strokeText(f.sub, 0, 34); c.fillStyle = C.ink; c.fillText(f.sub, 0, 34);
+      } else {
+        c.font = (f.kind === 'pts' ? '900 22px' : '900 20px') + ' "Cera Condensed", "Arial Narrow", sans-serif';
+        c.lineWidth = 5; c.lineJoin = 'round'; c.strokeStyle = '#fff';
+        const y = f.y - f.t * 50; c.strokeText(f.text, f.x, y);
+        c.fillStyle = f.kind === 'pts' ? C.ink : f.kind === 'bad' ? C.red : '#7b8a96'; c.fillText(f.text, f.x, y);
+      }
+      c.restore();
+    }
+    if (flash > 0) {
+      c.setTransform(S * DPR, 0, 0, S * DPR, 0, 0);
+      const bad = bucket.sad > 0;
+      c.fillStyle = bad ? `rgba(235,45,45,${flash * .22})` : `rgba(255,255,255,${flash * .5})`;
+      c.fillRect(0, 0, W, H);
+    }
+  }
+  const puckDirSign = () => (puck ? puck.dir : 1);
+
+  let last = performance.now(), frozen = false;
+  if (SHOT) window.__rt = { freeze: v => { frozen = v; }, state: () => ({ mode, ph: puck && puck.ph, t: puck && puck.t }), play: startAttempt, goal: renderGoal,
+    sheet(keys = ['burger', 'leg', 'fries', 'rostmaster', 'shefroll', 'dot', 'crown', 'puck'], gap = 120) { frozen = true; ctx.setTransform(S * DPR, 0, 0, S * DPR, 0, 0); ctx.fillStyle = '#fff'; ctx.fillRect(0, 0, W, H);
+      keys.forEach((k, i) => drawItem(ctx, k, 90 + (i % 2) * 180, gap / 2 + 20 + (i >> 1) * gap, 0, 2.2)); },
+    step(sec) { frozen = true; if (mode === 'pause') { mode = 'play'; show(null); } for (let i = 0; i < sec * 60; i++) update(1 / 60); draw(); return this.state(); } };
+  function loop(now) {
+    const dt = Math.min(.05, (now - last) / 1000); last = now;
+    if (!frozen) { if (mode !== 'pause') update(dt); draw(); }
+    requestAnimationFrame(loop);
+  }
+
+  // ---------- шапка и экраны ----------
+  const HEART = '<svg viewBox="0 0 24 22" aria-hidden="true"><path fill="#eb2d2d" d="M12 21.5 2.4 12.2C-.6 9.3-.8 4.6 2 1.9 4.7-.6 8.8-.3 11.2 2.5L12 3.4l.8-.9c2.4-2.8 6.5-3.1 9.2-.6 2.8 2.7 2.6 7.4-.4 10.3Z"/></svg>';
+  $('hLives').innerHTML = HEART.repeat(3);
+  function hud(hit) {
+    $('hScore').textContent = score;
+    [...$('hLives').children].forEach((h, i) => h.classList.toggle('lost', i >= lives));
+  }
+  function show(id) {
+    document.querySelectorAll('.screen').forEach(s => s.classList.toggle('on', s.id === id));
+    const playing = mode === 'play' || mode === 'pause';
+    $('hud').classList.toggle('dim', !playing);
+    $('bPause').style.display = mode === 'play' ? 'grid' : 'none';
+  }
+  const plural = (n, a, b, c) => n % 10 === 1 && n % 100 !== 11 ? a : n % 10 >= 2 && n % 10 <= 4 && (n % 100 < 10 || n % 100 >= 20) ? b : c;
+  function attText() {
+    if (UNLIMITED) return 'Тестовый режим: попытки без&nbsp;лимита';
+    const n = att().left;
+    return n > 0 ? `Сегодня осталось <b>${n} ${plural(n, 'попытка', 'попытки', 'попыток')}</b>` : 'Попытки на&nbsp;сегодня кончились&nbsp;— <b>приходи завтра</b>';
+  }
+  function renderBoard(el, limit) {
+    el.innerHTML = board().slice(0, limit).map((r, i) => `<tr class="${r.me ? 'me' : ''} ${i < 3 ? 'win' : ''}"><td>${i + 1}</td><td>${r.n}</td><td>${r.s}</td></tr>`).join('');
+  }
+  function refresh() {
+    $('attLine').innerHTML = attText(); $('attLine2').innerHTML = attText();
+    const none = !UNLIMITED && att().left <= 0;
+    $('bPlay').disabled = none; $('bAgain').disabled = none;
+    renderBoard($('lbSide'), 8);
+    startGoal();
+  }
+  let backTo = 'sStart';
+  function openBoard(from) { backTo = from; renderBoard($('lb'), 10); show('sBoard'); }
+  function startAttempt() {
+    if (!UNLIMITED) { const a = att(); if (a.left <= 0) return; a.left--; store.set('rt_att', a); }
+    newGame(); mode = 'play'; show(null);
+  }
+  // промокод за порог очков в одной попытке; порог черновой (26.10), ждёт цифры от Антона
+  const PROMO_AT = 1000;
+  function renderGoal(s) {
+    const g = $('overGoal');
+    if (s >= PROMO_AT) {
+      const code = 'RT-' + Math.random().toString(36).slice(2, 6).toUpperCase();
+      g.innerHTML = `<div class="goal-text">Промокод на&nbsp;скидку твой</div><div class="code">${code}</div>`;
+      return;
+    }
+    const left = PROMO_AT - s;
+    g.innerHTML = `<div class="bar"><i></i></div><div class="goal-cap"><span>До промокода</span><b>ещё ${left} ${plural(left, 'очко', 'очка', 'очков')}</b></div>`;
+    setTimeout(() => { const b = g.querySelector('.bar i'); if (b) b.style.width = Math.max(2, s / PROMO_AT * 100) + '%'; }, 60);
+  }
+  function endAttempt() {
+    mode = 'over'; addScore(score);
+    const best = board().find(r => r.me), place = board().findIndex(r => r.me) + 1;
+    $('overScore').textContent = score;
+    $('overTag').textContent = pucks ? `Попытка окончена · ${SK.many(pucks)}` : 'Попытка окончена';
+    $('overText').innerHTML = `Лучший результат&nbsp;— ${best.s}, ${place}-е место в&nbsp;рейтинге недели`;
+    renderGoal(score);
+    items = items.filter(i => i.y < rimY()); puck = null;
+    refresh(); show('sOver');
+  }
+  function pause(on) {
+    if (on && mode === 'play' && !dying) { mode = 'pause'; show('sPause'); }
+    else if (!on && mode === 'pause') { mode = 'play'; last = performance.now(); show(null); }
+  }
+
+  // ---------- стартовый экран: знак своего клуба фоном и в связке, подпись, шайба/мяч в третьей плитке ----------
+  document.querySelectorAll('.st-mark').forEach(e => e.src = SK.mark); document.querySelectorAll('.lockup .st-mark, .st-lockup .st-mark').forEach(e => e.alt = SK.club);
+  document.querySelectorAll('.st-cap').forEach(e => e.textContent = 'Ростикс × ' + SK.club);
+  document.querySelector('.st-thing').innerHTML = SK.things.replace(' ', '<br>');
+  // попытки — как увидит игрок (в тестовом режиме лимит не списывается, но на экране — дневные 3); полоса — рекорд недели к порогу промокода
+  function startGoal() {
+    const n = att().left;
+    $('attLine').innerHTML = n > 0 ? `Сегодня<b>${n} ${plural(n, 'попытка', 'попытки', 'попыток')}</b>` : 'Завтра&nbsp;— новые попытки';
+    const me = board().find(r => r.me), best = me ? me.s : 0, left = Math.max(0, PROMO_AT - best);
+    const cap = best >= PROMO_AT ? 'промокод получен' : best ? `ещё ${left} ${plural(left, 'очко', 'очка', 'очков')}` : `${PROMO_AT} очков за&nbsp;попытку`;
+    const pct = Math.max(best ? 2 : 0, Math.min(100, best / PROMO_AT * 100));
+    $('startGoal').innerHTML = `<div class="bar"><i style="width:${pct}%"></i></div><div class="goal-cap"><span>До промокода</span><b>${cap}</b></div>`;
+  }
+
+  $('bPlay').onclick = startAttempt; $('bAgain').onclick = startAttempt;
+  $('bBoard').onclick = () => openBoard('sStart'); $('bBoard2').onclick = () => openBoard('sOver');
+  $('bBoardBack').onclick = () => show(backTo);
+  $('bPause').onclick = () => pause(true); $('bResume').onclick = () => pause(false);
+  $('bQuit').onclick = () => { mode = 'play'; endAttempt(); };
+
+  // управление: палец/мышь по полю, стрелки или A/D
+  function pointerX(e) { const r = cv.getBoundingClientRect(); return (e.clientX - r.left) / r.width * W; }
+  wrap.addEventListener('pointerdown', e => { if (mode === 'play') bucket.tx = pointerX(e); });
+  wrap.addEventListener('pointermove', e => { if (mode === 'play' && (e.pointerType === 'mouse' || e.buttons || e.pressure > 0)) bucket.tx = pointerX(e); });
+  addEventListener('keydown', e => {
+    if (e.key === 'ArrowLeft' || e.key === 'a' || e.key === 'ф') keys.l = true;
+    if (e.key === 'ArrowRight' || e.key === 'd' || e.key === 'в') keys.r = true;
+    if (e.key === 'Escape' || e.key === 'p' || e.key === 'з') pause(mode === 'play');
+    if ((e.key === 'Enter' || e.key === ' ') && (mode === 'menu' || mode === 'over') && document.activeElement.tagName !== 'BUTTON') startAttempt();
+  });
+  addEventListener('keyup', e => {
+    if (e.key === 'ArrowLeft' || e.key === 'a' || e.key === 'ф') keys.l = false;
+    if (e.key === 'ArrowRight' || e.key === 'd' || e.key === 'в') keys.r = false;
+  });
+  document.addEventListener('visibilitychange', () => { if (document.hidden && !frozen) pause(true); });
+
+  // значки в легенде
+  function paintLegend() {
+    document.querySelectorAll('canvas[data-k]').forEach(el => {
+      // data-z — свой масштаб значка вокруг центра (плитки старта: размеры значков с кадра Антона)
+      const k = el.dataset.k, d = 4, z = +el.dataset.z || 1; el.width = 32 * d; el.height = 32 * d;
+      const c = el.getContext('2d'); c.translate(16 * d, 16 * d); c.scale(z, z); c.translate(-16 * d, -16 * d); c.scale(d * .62, d * .62); drawItem(c, k, 26, k === 'fries' || k === 'rostmaster' ? 30 : 27);
+    });
+  }
+  LOGO.onload = paintLegend;
+
+  addEventListener('resize', fit);
+  fit(); refresh(); paintLegend(); requestAnimationFrame(loop);
+})();
+</script>
+
+</body></html>
